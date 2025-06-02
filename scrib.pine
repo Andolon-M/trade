@@ -1,4 +1,4 @@
-//@version=5
+//@version=6
 indicator("Divergencias RSI/MACD + OrderBlock Zonas", overlay=true)
 
 // === INPUTS ===
@@ -23,13 +23,13 @@ macdLow = ta.pivotlow(macdLine, 5, 5)
 
 // === DIVERGENCIAS ===
 // Alcista: precio hace low más bajo, RSI o MACD hace low más alto
-divRSIBull = pivLow and rsiLow and close[pivLow] < close and rsi[pivLow] > rsi
-divMACDBull = pivLow and macdLow and close[pivLow] < close and macdLine[pivLow] > macdLine
+divRSIBull = not na(pivLow) and not na(rsiLow) and close[pivLow] < close and rsi[rsiLow] > rsi
+divMACDBull = not na(pivLow) and not na(macdLow) and close[pivLow] < close and macdLine[macdLow] > macdLine
 bullishDiv = divRSIBull or divMACDBull
 
 // Bajista: precio hace high más alto, RSI o MACD hace high más bajo
-divRSIBear = pivHigh and rsiHigh and close[pivHigh] > close and rsi[pivHigh] < rsi
-divMACDBear = pivHigh and macdHigh and close[pivHigh] > close and macdLine[pivHigh] < macdLine
+divRSIBear = not na(pivHigh) and not na(rsiHigh) and close[pivHigh] > close and rsi[rsiHigh] < rsi
+divMACDBear = not na(pivHigh) and not na(macdHigh) and close[pivHigh] > close and macdLine[macdHigh] < macdLine
 bearishDiv = divRSIBear or divMACDBear
 
 // === ZONAS ORDERBLOCK SIMULADAS ===
