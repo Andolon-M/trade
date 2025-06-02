@@ -1,0 +1,67 @@
+//@version=6
+indicator("Oscilador Multi-RSI", overlay=false)
+
+// === INPUTS ===
+rsiCorto = input.int(7, title="RSI Corto", minval=1, maxval=50)
+rsiMedio = input.int(14, title="RSI Medio", minval=1, maxval=50)
+rsiLargo = input.int(21, title="RSI Largo", minval=1, maxval=50)
+suavizadoPeriodo = input.int(5, title="Suavizado", minval=1, maxval=30)
+nivelSobrecompra = input.int(70, title="Nivel Sobrecompra", minval=50, maxval=100)
+nivelSobreventa = input.int(30, title="Nivel Sobreventa", minval=0, maxval=50)
+
+// === CÁLCULOS DE RSI ===
+rsiC = ta.rsi(close, rsiCorto)
+rsiM = ta.rsi(close, rsiMedio)
+rsiL = ta.rsi(close, rsiLargo)
+
+// === COMBINACIÓN DE OSCILADORES ===
+// Promedio ponderado de los tres RSI
+osciladorBase = (rsiC * 3 + rsiM * 2 + rsiL * 1) / 6
+
+// Aplicamos suavizado para reducir ruido
+osciladorFinal = ta.sma(osciladorBase, suavizadoPeriodo)
+
+// === ZONAS DE SOBRECOMPRA/SOBREVENTA ===
+enSobrecompra = osciladorFinal >= nivelSobrecompra
+enSobreventa = osciladorFinal <= nivelSobreventa
+
+// === DETECCIÓN DE DIVERGENCIAS ===
+// Búsqueda de pivotes de precio y oscilador
+pivoteAltoPrecio = ta.pivothigh(close, 5, 5)
+pivoteBajoPrecio = ta.pivotlow(close, 5, 5)
+pivoteAltoOsc = ta.pivothigh(osciladorFinal, 5, 5)
+pivoteBajoOsc = ta.pivotlow(osciladorFinal, 5, 5)
+
+// Divergencia bajista: precio sube pero oscilador baja
+divBajista = not na(pivoteAltoPrecio) and not na(pivoteAltoOsc) and 
+             close[pivoteAltoPrecio] > close[pivoteAltoPrecio + 10] and 
+             osciladorFinal[pivoteAltoOsc] < osciladorFinal[pivoteAltoOsc + 10] and
+             enSobrecompra
+
+// Divergencia alcista: precio baja pero oscilador sube
+divAlcista = not na(pivoteBajoPrecio) and not na(pivoteBajoOsc) and 
+             close[pivoteBajoPrecio] < close[pivoteBajoPrecio + 10] and 
+             osciladorFinal[pivoteBajoOsc] > osciladorFinal[pivoteBajoOsc + 10] and
+             enSobreventa
+
+// === VISUALIZACIÓN ===
+// Colores según estado del oscilador
+colorOscilador = divBajista ? color.red : divAlcista ? color.green : 
+                 enSobrecompra ? color.rgb(255, 170, 170) : 
+                 enSobreventa ? color.rgb(170, 255, 170) : color.blue
+
+// Gráfico principal del oscilador
+plot(osciladorFinal, title="Multi-RSI", color=colorOscilador, linewidth=2)
+
+// Líneas de referencia
+hline(nivelSobrecompra, title="Sobrecompra", color=color.red, linestyle=hline.style_dashed)
+hline(nivelSobreventa, title="Sobreventa", color=color.green, linestyle=hline.style_dashed)
+hline(50, title="Nivel Neutral", color=color.gray, linestyle=hline.style_dotted)
+
+// Señales visuales de divergencia
+plotshape(divAlcista, title="Divergencia Alcista", location=location.bottom, color=color.green, style=shape.triangleup, size=size.small)
+plotshape(divBajista, title="Divergencia Bajista", location=location.top, color=color.red, style=shape.triangledown, size=size.small)
+
+// === ALERTAS ===
+alertcondition(divAlcista, title="Alerta Divergencia Alcista", message="¡Divergencia alcista detectada!")
+alertcondition(divBajista, title="Alerta Divergencia Bajista", message="¡Divergencia bajista detectada!")

@@ -1,0 +1,50 @@
+//@version=6
+indicator("Divergencias RSI/MACD + OrderBlock Zonas", overlay=true)
+
+// === INPUTS ===
+rsiLen = input.int(5, title="RSI Length")
+macdFast = input.int(8, title="MACD Fast")
+macdSlow = input.int(21, title="MACD Slow")
+macdSignal = input.int(5, title="MACD Signal")
+obZoneLen = input.int(20, title="OrderBlock Zona Longitud", minval=1)
+
+// === INDICADORES BASE ===
+rsi = ta.rsi(close, rsiLen)
+macdLine = ta.ema(close, macdFast) - ta.ema(close, macdSlow)
+macdSignalLine = ta.ema(macdLine, macdSignal)
+
+// === PIVOTS PARA DETECTAR DIVERGENCIAS ===
+pivHigh = ta.pivothigh(close, 5, 5)
+pivLow = ta.pivotlow(close, 5, 5)
+rsiHigh = ta.pivothigh(rsi, 5, 5)
+rsiLow = ta.pivotlow(rsi, 5, 5)
+macdHigh = ta.pivothigh(macdLine, 5, 5)
+macdLow = ta.pivotlow(macdLine, 5, 5)
+
+// === DIVERGENCIAS ===
+// Alcista: precio hace low más bajo, RSI o MACD hace low más alto
+divRSIBull = not na(pivLow) and not na(rsiLow) and close[pivLow] < close and rsi[rsiLow] > rsi
+divMACDBull = not na(pivLow) and not na(macdLow) and close[pivLow] < close and macdLine[macdLow] > macdLine
+bullishDiv = divRSIBull or divMACDBull
+
+// Bajista: precio hace high más alto, RSI o MACD hace high más bajo
+divRSIBear = not na(pivHigh) and not na(rsiHigh) and close[pivHigh] > close and rsi[rsiHigh] < rsi
+divMACDBear = not na(pivHigh) and not na(macdHigh) and close[pivHigh] > close and macdLine[macdHigh] < macdLine
+bearishDiv = divRSIBear or divMACDBear
+
+// === ZONAS ORDERBLOCK SIMULADAS ===
+obHigh = ta.highest(high, obZoneLen)
+obLow = ta.lowest(low, obZoneLen)
+inOverbought = close >= obHigh
+inOversold = close <= obLow
+
+// === FILTRAR DIVERGENCIAS SOLO EN ZONAS CLAVE ===
+validBullSignal = bullishDiv and inOversold
+validBearSignal = bearishDiv and inOverbought
+
+// === PLOTEO Y ALERTAS ===
+plotshape(validBullSignal, title="Alerta Compra", location=location.belowbar, color=color.green, style=shape.labelup, text="Buy")
+plotshape(validBearSignal, title="Alerta Venta", location=location.abovebar, color=color.red, style=shape.labeldown, text="Sell")
+
+alertcondition(validBullSignal, title="Alerta Divergencia Alcista", message="¡Divergencia Alcista detectada!")
+alertcondition(validBearSignal, title="Alerta Divergencia Bajista", message="¡Divergencia Bajista detectada!")
