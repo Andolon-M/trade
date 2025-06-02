@@ -1,17 +1,30 @@
 //@version=6
-indicator("Divergencias RSI/MACD + OrderBlock Zonas", overlay=true)
+indicator("Divergencias RSI/MACD Avanzado", overlay=true)
 
 // === INPUTS ===
-rsiLen = input.int(5, title="RSI Length")
-macdFast = input.int(8, title="MACD Fast")
-macdSlow = input.int(21, title="MACD Slow")
-macdSignal = input.int(5, title="MACD Signal")
-obZoneLen = input.int(20, title="OrderBlock Zona Longitud", minval=1)
+rsiLen = input.int(14, title="RSI Length", minval=1)
+macdFast = input.int(12, title="MACD Fast", minval=1)
+macdSlow = input.int(26, title="MACD Slow", minval=1)
+macdSignal = input.int(9, title="MACD Signal", minval=1)
+obZoneLen = input.int(20, title="Zona OB/OS Length", minval=1)
+rsiOverbought = input.int(90, title="RSI Sobrecompra", minval=50, maxval=100)
+rsiOversold = input.int(10, title="RSI Sobreventa", minval=0, maxval=50)
 
 // === INDICADORES BASE ===
 rsi = ta.rsi(close, rsiLen)
-macdLine = ta.ema(close, macdFast) - ta.ema(close, macdSlow)
-macdSignalLine = ta.ema(macdLine, macdSignal)
+[macdLine, signalLine, histLine] = ta.macd(close, macdFast, macdSlow, macdSignal)
+
+// === ZONAS OB/OS ===
+highLevel = ta.highest(high, obZoneLen)
+lowLevel = ta.lowest(low, obZoneLen)
+isOverbought = close >= highLevel * 0.995  // 99.5% del máximo
+isOversold = close <= lowLevel * 1.005     // 100.5% del mínimo
+
+// === SEÑALES SIMPLES BASADAS EN CRUCES ===
+rsiOverboughtSignal = ta.crossunder(rsi, rsiOverbought)
+rsiOversoldSignal = ta.crossover(rsi, rsiOversold)
+macdCrossOverSignal = ta.crossover(macdLine, signalLine)
+macdCrossUnderSignal = ta.crossunder(macdLine, signalLine)
 
 // === PIVOTS PARA DETECTAR DIVERGENCIAS ===
 // Reducir lookback para evitar error de datos históricos
@@ -53,19 +66,32 @@ if not na(pivHigh) and not na(macdHigh)
 
 bearishDiv = divRSIBear or divMACDBear
 
-// === ZONAS ORDERBLOCK SIMULADAS ===
-obHigh = ta.highest(high, obZoneLen)
-obLow = ta.lowest(low, obZoneLen)
-inOverbought = close >= obHigh
-inOversold = close <= obLow
+// === COMBINAR TODAS LAS SEÑALES ===
+// Señal de compra: (RSI cruzando sobre nivel sobreventa o MACD cruzando sobre línea de señal) y en zona sobreventa
+// O divergencia alcista en zona sobreventa
+buyRSISignal = rsiOversoldSignal and isOversold
+buyMACDSignal = macdCrossOverSignal and isOversold
+buyDivergenceSignal = bullishDiv and isOversold
+buySignal = buyRSISignal or buyMACDSignal or buyDivergenceSignal
 
-// === FILTRAR DIVERGENCIAS SOLO EN ZONAS CLAVE ===
-validBullSignal = bullishDiv and inOversold
-validBearSignal = bearishDiv and inOverbought
+// Señal de venta: (RSI cruzando bajo nivel sobrecompra o MACD cruzando bajo línea de señal) y en zona sobrecompra
+// O divergencia bajista en zona sobrecompra
+sellRSISignal = rsiOverboughtSignal and isOverbought
+sellMACDSignal = macdCrossUnderSignal and isOverbought
+sellDivergenceSignal = bearishDiv and isOverbought
+sellSignal = sellRSISignal or sellMACDSignal or sellDivergenceSignal
 
-// === PLOTEO Y ALERTAS ===
-plotshape(validBullSignal, title="Alerta Compra", location=location.belowbar, color=color.green, style=shape.labelup, text="Buy")
-plotshape(validBearSignal, title="Alerta Venta", location=location.abovebar, color=color.red, style=shape.labeldown, text="Sell")
+// === VISUALIZACIÓN ===
+// Señales
+plotshape(buySignal, title="Señal de Compra", location=location.belowbar, 
+     color=color.green, style=shape.labelup, size=size.normal, text="BUY")
+plotshape(sellSignal, title="Señal de Venta", location=location.abovebar, 
+     color=color.red, style=shape.labeldown, size=size.normal, text="SELL")
 
-alertcondition(validBullSignal, title="Alerta Divergencia Alcista", message="¡Divergencia Alcista detectada!")
-alertcondition(validBearSignal, title="Alerta Divergencia Bajista", message="¡Divergencia Bajista detectada!")
+// Indicadores de zonas
+bgcolor(isOverbought ? color.new(color.red, 95) : na)
+bgcolor(isOversold ? color.new(color.green, 95) : na)
+
+// === ALERTAS ===
+alertcondition(buySignal, title="Alerta de Compra", message="¡Señal de compra detectada!")
+alertcondition(sellSignal, title="Alerta de Venta", message="¡Señal de venta detectada!")
